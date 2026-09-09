@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>로또 머신 이름 뽑기 v2</title>
+<style>
+  :root{
+    --bg:#07111f;
+    --panel:#0f1b2d;
+    --line:#20324c;
+    --text:#f8fafc;
+    --muted:#94a3b8;
+    --accent:#38bdf8;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 30% 10%, rgba(56,189,248,.10), transparent 30%),
+      radial-gradient(circle at 80% 20%, rgba(168,85,247,.10), transparent 28%),
+      linear-gradient(180deg,#07111f,#0b1320 60%,#08101a);
+    color:var(--text);
+    font-family:"Pretendard","Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+    overflow-x:hidden;
+  }
+  .app{
+    width:min(1220px,95vw);
+    margin:0 auto;
+    padding:26px 0 38px;
+  }
+  h1{
+    margin:0;
+    text-align:center;
+    font-size:clamp(30px,4vw,52px);
+    letter-spacing:-.05em;
+  }
+  .subtitle{
+    margin:8px 0 24px;
+    text-align:center;
+    color:var(--muted);
+    font-weight:800;
+  }
+  .layout{
+    display:grid;
+    grid-template-columns:minmax(560px,1fr) 360px;
+    gap:24px;
+    align-items:start;
+  }
+  .machine-card,.control-card{
+    background:rgba(15,27,45,.88);
+    border:1px solid rgba(148,163,184,.14);
+    box-shadow:0 24px 70px rgba(0,0,0,.28);
+    border-radius:28px;
+    backdrop-filter:blur(10px);
+  }
+  .machine-card{
+    padding:20px;
+    position:relative;
+  }
+  .stage{
+    position:relative;
+    width:100%;
+    aspect-ratio:1.15 / 1;
+    min-height:620px;
+  }
+  #machineCanvas{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    border-radius:22px;
+  }
+  .machine-label{
+    position:absolute;
+    left:50%;
+    top:18px;
+    transform:translateX(-50%);
+    z-index:5;
+    padding:10px 18px;
+    border-radius:999px;
+    background:rgba(2,6,23,.72);
+    border:1px solid rgba(255,255,255,.14);
+    font-weight:1000;
+    letter-spacing:.04em;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  .control-card{
+    padding:24px;
+  }
+  .control-card h2{
+    margin:0 0 8px;
+    font-size:24px;
+  }
+  .tip{
+    margin:0 0 18px;
+    color:var(--muted);
+    line-height:1.55;
+    font-size:14px;
+  }
+  .name-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  input{
+    width:100%;
+    border:1px solid #263a57;
+    background:#0b1524;
+    color:#fff;
+    border-radius:13px;
+    padding:12px 13px;
+    font-size:15px;
+    font-weight:900;
+    outline:none;
+  }
+  input:focus{
+    border-color:#38bdf8;
+    box-shadow:0 0 0 3px rgba(56,189,248,.16);
+  }
+  button{
+    width:100%;
+    border:0;
+    border-radius:15px;
+    padding:14px 16px;
+    font-size:17px;
+    font-weight:1000;
+    cursor:pointer;
+  }
+  #drawBtn{
+    margin-top:18px;
+    color:#04121f;
+    background:linear-gradient(135deg,#7dd3fc,#22d3ee);
+    box-shadow:0 12px 28px rgba(34,211,238,.2);
+  }
+  #resetBtn{
+    margin-top:10px;
+    color:#cbd5e1;
+    background:#18263a;
+  }
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .status{
+    margin-top:16px;
+    min-height:24px;
+    text-align:center;
+    color:#cbd5e1;
+    font-weight:900;
+  }
+
+  .winner-overlay{
+    position:fixed;
+    inset:0;
+    z-index:100;
+    display:none;
+    place-items:center;
+    background:rgba(2,6,23,.70);
+    backdrop-filter:blur(8px);
+  }
+  .winner-overlay.show{display:grid}
+  .winner-card{
+    width:min(600px,90vw);
+    padding:42px 26px 38px;
+    border-radius:32px;
+    text-align:center;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(251,191,36,.25), transparent 35%),
+      linear-gradient(145deg,#fff,#fff7ed);
+    color:#111827;
+    box-shadow:0 30px 90px rgba(0,0,0,.45);
+    animation:pop .75s cubic-bezier(.18,.88,.2,1.2) both;
+    position:relative;
+    overflow:hidden;
+  }
+  .winner-card::before{
+    content:"";
+    position:absolute;
+    inset:-40%;
+    background:conic-gradient(from 0deg,transparent,rgba(250,204,21,.22),transparent 25%);
+    animation:shine 2.4s linear infinite;
+  }
+  .winner-inner{
+    position:relative;
+    z-index:2;
+  }
+  .winner-ball{
+    width:130px;
+    aspect-ratio:1;
+    margin:0 auto 18px;
+    display:grid;
+    place-items:center;
+    border-radius:50%;
+    border:8px solid rgba(255,255,255,.92);
+    box-shadow:
+      inset -15px -18px 25px rgba(0,0,0,.15),
+      inset 15px 14px 20px rgba(255,255,255,.34),
+      0 16px 30px rgba(0,0,0,.18);
+    color:#fff;
+    font-size:24px;
+    font-weight:1000;
+    text-align:center;
+    padding:10px;
+    overflow-wrap:anywhere;
+  }
+  .win-title{
+    font-size:clamp(38px,7vw,70px);
+    font-weight:1000;
+    color:#dc2626;
+    letter-spacing:-.04em;
+    text-shadow:0 4px 0 rgba(220,38,38,.12);
+  }
+  .win-name{
+    margin-top:8px;
+    font-size:clamp(34px,6vw,58px);
+    font-weight:1000;
+    color:#7c3aed;
+    letter-spacing:-.04em;
+  }
+  .close-btn{
+    width:auto;
+    min-width:150px;
+    margin-top:24px;
+    background:linear-gradient(135deg,#f59e0b,#ef4444);
+    color:#fff;
+    padding:13px 26px;
+  }
+  #fxCanvas{
+    position:fixed;
+    inset:0;
+    z-index:99;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+  }
+  @keyframes pop{
+    0%{opacity:0;transform:scale(.25) rotate(-4deg)}
+    70%{opacity:1;transform:scale(1.07) rotate(1deg)}
+    100%{transform:scale(1) rotate(0)}
+  }
+  @keyframes shine{
+    to{transform:rotate(360deg)}
+  }
+  @media(max-width:970px){
+    .layout{grid-template-columns:1fr}
+    .control-card{order:-1}
+    .stage{min-height:560px}
+  }
+  @media(max-width:600px){
+    .stage{min-height:480px}
+    .name-grid{grid-template-columns:1fr}
+    .machine-card{padding:10px}
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <h1>🎱 로또 머신 이름 뽑기</h1>
+  <p class="subtitle">공이 실제로 흡입구 쪽으로 끌려가고, 가까운 공이 자연스럽게 배출됩니다.</p>
+
+  <div class="layout">
+    <section class="machine-card">
+      <div class="stage">
+        <div class="machine-label">LUCKY DRAW MACHINE</div>
+        <canvas id="machineCanvas" width="900" height="780"></canvas>
+      </div>
+    </section>
+
+    <aside class="control-card">
+      <h2>참가자 이름</h2>
+      <p class="tip">최대 10명까지 입력할 수 있습니다. 빈 칸은 자동으로 제외됩니다.</p>
+      <div class="name-grid" id="nameGrid"></div>
+      <button id="drawBtn">🌪️ 추첨 시작</button>
+      <button id="resetBtn">↻ 기본 이름으로 초기화</button>
+      <div class="status" id="status">이름을 입력하고 추첨 시작을 눌러주세요.</div>
+    </aside>
+  </div>
+</main>
+
+<canvas id="fxCanvas"></canvas>
+
+<div class="winner-overlay" id="winnerOverlay">
+  <div class="winner-card">
+    <div class="winner-inner">
+      <div class="winner-ball" id="winnerBall">김민준</div>
+      <div class="win-title">🎉 당첨! 🎉</div>
+      <div class="win-name" id="winnerName">김민준</div>
+      <button class="close-btn" id="closeBtn">확인</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const machine = document.getElementById('machineCanvas');
+  const ctx = machine.getContext('2d');
+  const nameGrid = document.getElementById('nameGrid');
+  const drawBtn = document.getElementById('drawBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const status = document.getElementById('status');
+
+  const winnerOverlay = document.getElementById('winnerOverlay');
+  const winnerName = document.getElementById('winnerName');
+  const winnerBall = document.getElementById('winnerBall');
+  const closeBtn = document.getElementById('closeBtn');
+
+  const defaults = ['김민준','이서준','박지우','최하윤','정도윤','한서아','윤지호','임수빈','오지민','강유나'];
+  const colors = ['#ef4444','#f59e0b','#eab308','#22c55e','#14b8a6','#0ea5e9','#3b82f6','#8b5cf6','#d946ef','#f43f5e'];
+
+  let balls = [];
+  let state = 'idle'; // idle, mixing, suction, tube
+  let animId = null;
+  let startTime = 0;
+  let lastTime = 0;
+  let candidateIndex = -1;
+  let selectedBall = null;
+  let tubeStart = null;
+  let tubeProgress = 0;
+
+  const chamber = { cx:395, cy:410, r:265 };
+  const mouth = { x:607, y:285 };
+  const tubeCurve = {
+    p0:{x:607,y:285},
+    p1:{x:675,y:262},
+    p2:{x:740,y:210},
+    p3:{x:746,y:118}
+  };
+
+  function createInputs(values=defaults){
+    nameGrid.innerHTML='';
+    for(let i=0;i<10;i++){
+      const input=document.createElement('input');
+      input.type='text';
+      input.maxLength=12;
+      input.value=values[i] || '';
+      input.placeholder=`${i+1}번 이름`;
+      input.addEventListener('input', resetBallsFromInputs);
+      nameGrid.appendChild(input);
+    }
+    resetBallsFromInputs();
+  }
+
+  function getNames(){
+    return [...nameGrid.querySelectorAll('input')]
+      .map(i=>i.value.trim())
+      .filter(Boolean)
+      .slice(0,10);
+  }
+
+  function resetBallsFromInputs(){
+    if(state !== 'idle') return;
+    const names = getNames();
+    balls = names.map((name,i)=>{
+      const a=(Math.PI*2/Math.max(1,names.length))*i + Math.random()*0.35;
+      const rr=70+Math.random()*115;
+      return {
+        name,
+        color:colors[i%colors.length],
+        x:chamber.cx + Math.cos(a)*rr,
+        y:chamber.cy + Math.sin(a)*rr,
+        vx:(Math.random()-.5)*1.6,
+        vy:(Math.random()-.5)*1.6,
+        r:34
+      };
+    });
+    drawScene();
+  }
+
+  function roundedRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  function cubicPoint(p0,p1,p2,p3,t){
+    const u=1-t;
+    return {
+      x:u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x,
+      y:u*u*u*p0.y + 3*u*u*t*p1.y + 3*u*t*t*p2.y + t*t*t*p3.y
+    };
+  }
+
+  function distance(a,b){
+    return Math.hypot(a.x-b.x, a.y-b.y);
+  }
+
+  function drawMachineBase(){
+    ctx.clearRect(0,0,machine.width,machine.height);
+
+    const bg=ctx.createLinearGradient(0,0,0,machine.height);
+    bg.addColorStop(0,'#10243b');
+    bg.addColorStop(1,'#091522');
+    ctx.fillStyle=bg;
+    ctx.fillRect(0,0,machine.width,machine.height);
+
+    const floor=ctx.createRadialGradient(430,680,20,430,680,330);
+    floor.addColorStop(0,'rgba(56,189,248,.18)');
+    floor.addColorStop(1,'rgba(56,189,248,0)');
+    ctx.fillStyle=floor;
+    ctx.fillRect(0,520,900,260);
+
+    ctx.fillStyle='#17263a';
+    roundedRect(270,655,250,42,16);
+    ctx.fill();
+    ctx.fillStyle='#22344e';
+    roundedRect(300,695,190,34,14);
+    ctx.fill();
+
+    const outer=ctx.createRadialGradient(chamber.cx-90,chamber.cy-110,40,chamber.cx,chamber.cy,chamber.r);
+    outer.addColorStop(0,'rgba(255,255,255,.22)');
+    outer.addColorStop(.45,'rgba(125,211,252,.08)');
+    outer.addColorStop(1,'rgba(14,116,144,.04)');
+    ctx.beginPath();
+    ctx.arc(chamber.cx,chamber.cy,chamber.r+12,0,Math.PI*2);
+    ctx.fillStyle=outer;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(chamber.cx,chamber.cy,chamber.r+14,0,Math.PI*2);
+    ctx.strokeStyle='rgba(186,230,253,.65)';
+    ctx.lineWidth=10;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(chamber.cx,chamber.cy,chamber.r+2,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,.16)';
+    ctx.lineWidth=3;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(chamber.cx-70,chamber.cy-70,chamber.r-35,Math.PI*1.06,Math.PI*1.48);
+    ctx.strokeStyle='rgba(255,255,255,.20)';
+    ctx.lineWidth=12;
+    ctx.lineCap='round';
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(chamber.cx,640);
+    ctx.fillStyle='#152438';
+    ctx.beginPath();
+    ctx.arc(0,0,58,Math.PI,0);
+    ctx.lineTo(58,18);
+    ctx.lineTo(-58,18);
+    ctx.closePath();
+    ctx.fill();
+    for(let i=0;i<6;i++){
+      ctx.rotate(Math.PI/3);
+      ctx.fillStyle='rgba(56,189,248,.28)';
+      ctx.fillRect(6,-4,38,8);
+    }
+    ctx.restore();
+
+    // Outlet tube
+    ctx.lineCap='round';
+    ctx.lineJoin='round';
+    ctx.beginPath();
+    ctx.moveTo(607,285);
+    ctx.bezierCurveTo(672,262,717,225,737,185);
+    ctx.bezierCurveTo(745,160,746,140,746,118);
+    ctx.strokeStyle='rgba(186,230,253,.32)';
+    ctx.lineWidth=64;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(607,285);
+    ctx.bezierCurveTo(672,262,717,225,737,185);
+    ctx.bezierCurveTo(745,160,746,140,746,118);
+    ctx.strokeStyle='rgba(255,255,255,.68)';
+    ctx.lineWidth=4;
+    ctx.stroke();
+
+    ctx.fillStyle='#1e293b';
+    roundedRect(708,80,76,42,13);
+    ctx.fill();
+    ctx.fillStyle='#334155';
+    roundedRect(716,87,60,12,6);
+    ctx.fill();
+
+    // Mouth highlight
+    const pulse = 0.5 + 0.5*Math.sin(performance.now()/180);
+    ctx.beginPath();
+    ctx.arc(mouth.x,mouth.y,16 + pulse*4,0,Math.PI*2);
+    ctx.fillStyle = (state==='suction' || state==='tube') ? `rgba(250,204,21,${0.35 + pulse*0.25})` : 'rgba(255,255,255,.18)';
+    ctx.fill();
+
+    // Wind arrows in chamber
+    if(state==='mixing' || state==='suction'){
+      const t=performance.now()/240;
+      for(let i=0;i<5;i++){
+        const y=575-(i*22)+Math.sin(t+i)*8;
+        ctx.strokeStyle=`rgba(56,189,248,${.16+i*.05})`;
+        ctx.lineWidth=4;
+        ctx.beginPath();
+        ctx.moveTo(chamber.cx-50+i*25,y);
+        ctx.quadraticCurveTo(chamber.cx-35+i*25,y-20,chamber.cx-20+i*25,y-40);
+        ctx.stroke();
+      }
+    }
+
+    // Suction lines toward mouth
+    if(state==='suction' || state==='tube'){
+      const tt = performance.now()/140;
+      for(let i=0;i<5;i++){
+        ctx.strokeStyle=`rgba(125,211,252,${0.15+i*0.06})`;
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        const sy = 200 + i*32 + Math.sin(tt+i)*5;
+        ctx.moveTo(490, sy);
+        ctx.quadraticCurveTo(560, sy+10, mouth.x-4, mouth.y-5 + (i-2)*4);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawBall(ball, alpha=1, scale=1){
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(ball.x,ball.y);
+    ctx.scale(scale,scale);
+
+    const g=ctx.createRadialGradient(-10,-12,6,0,0,ball.r);
+    g.addColorStop(0,'rgba(255,255,255,.92)');
+    g.addColorStop(.18,ball.color);
+    g.addColorStop(1,'rgba(0,0,0,.22)');
+
+    ctx.beginPath();
+    ctx.arc(0,0,ball.r,0,Math.PI*2);
+    ctx.fillStyle=g;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0,0,ball.r-2,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,.72)';
+    ctx.lineWidth=3;
+    ctx.stroke();
+
+    ctx.fillStyle='rgba(255,255,255,.94)';
+    roundedRect(-ball.r*.72,-11,ball.r*1.44,24,9);
+    ctx.fill();
+
+    ctx.fillStyle='#111827';
+    const size = ball.name.length >= 5 ? 13 : 15;
+    ctx.font=`1000 ${size}px "Noto Sans KR", sans-serif`;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(ball.name,0,1);
+
+    ctx.restore();
+  }
+
+  function drawCandidateRing(ball){
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(ball.x,ball.y,ball.r+10,0,Math.PI*2);
+    ctx.strokeStyle='rgba(250,204,21,.96)';
+    ctx.lineWidth=5;
+    ctx.shadowColor='#fde047';
+    ctx.shadowBlur=20;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawScene(){
+    drawMachineBase();
+
+    balls.forEach((b,i)=>{
+      drawBall(b);
+      if(state==='suction' && i===candidateIndex) drawCandidateRing(b);
+    });
+
+    if(state==='tube' && selectedBall){
+      drawBall(selectedBall,1,1.06);
+    }
+  }
+
+  function keepInside(ball){
+    const dx = ball.x - chamber.cx;
+    const dy = ball.y - chamber.cy;
+    const d = Math.hypot(dx,dy);
+    const max = chamber.r - ball.r - 10;
+    if(d > max){
+      const nx = dx/d, ny = dy/d;
+      ball.x = chamber.cx + nx*max;
+      ball.y = chamber.cy + ny*max;
+
+      const dot = ball.vx*nx + ball.vy*ny;
+      ball.vx -= 1.8*dot*nx;
+      ball.vy -= 1.8*dot*ny;
+      ball.vx *= .92;
+      ball.vy *= .92;
+    }
+  }
+
+  function resolveCollisions(){
+    for(let i=0;i<balls.length;i++){
+      for(let j=i+1;j<balls.length;j++){
+        const a=balls[i], b=balls[j];
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const d=Math.hypot(dx,dy);
+        const min=a.r+b.r-3;
+        if(d && d<min){
+          const nx=dx/d, ny=dy/d;
+          const overlap=(min-d)/2;
+          a.x-=nx*overlap; a.y-=ny*overlap;
+          b.x+=nx*overlap; b.y+=ny*overlap;
+
+          const rvx=b.vx-a.vx, rvy=b.vy-a.vy;
+          const rel=rvx*nx+rvy*ny;
+          if(rel<0){
+            const impulse=-rel*.82;
+            a.vx-=impulse*nx; a.vy-=impulse*ny;
+            b.vx+=impulse*nx; b.vy+=impulse*ny;
+          }
+        }
+      }
+    }
+  }
+
+  function updateFloating(dt){
+    const time = performance.now()/1000;
+    balls.forEach((b,i)=>{
+      const dx=b.x-chamber.cx;
+      const jet=Math.max(0, 1-Math.abs(dx)/180);
+      b.vy += (-0.020*jet - 0.006*Math.sin(time*4+i))*dt;
+      b.vx += (0.008*Math.sin(time*3.2+i*1.7))*dt;
+      b.vx += (Math.random()-.5)*0.012*dt;
+      b.vy += (Math.random()-.5)*0.012*dt;
+      b.vx *= .996;
+      b.vy *= .996;
+
+      const maxSpeed=7.2;
+      const s=Math.hypot(b.vx,b.vy);
+      if(s>maxSpeed){
+        b.vx=b.vx/s*maxSpeed;
+        b.vy=b.vy/s*maxSpeed;
+      }
+
+      b.x += b.vx*dt*.06;
+      b.y += b.vy*dt*.06;
+      b.vy += .0035*dt;
+      keepInside(b);
+    });
+    resolveCollisions();
+  }
+
+  function nearestBallIndexToMouth(){
+    let best = 0;
+    let bestD = Infinity;
+    balls.forEach((b,i)=>{
+      const d = distance(b, mouth);
+      if(d < bestD){
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  }
+
+  function updateSuction(dt){
+    // Candidate is the currently closest ball when suction starts.
+    // It still has to move physically into the mouth.
+    balls.forEach((b,i)=>{
+      const dx = mouth.x - b.x;
+      const dy = mouth.y - b.y;
+      const dist = Math.max(12, Math.hypot(dx,dy));
+      const nx = dx / dist;
+      const ny = dy / dist;
+
+      const pull = (i === candidateIndex ? 0.11 : 0.055) * dt;
+      const extra = Math.max(0, 150 - dist) / 150;
+      const swirl = (i === candidateIndex ? 0.02 : 0.01) * dt;
+
+      b.vx += nx * pull * (2.0 + extra*3.0);
+      b.vy += ny * pull * (2.0 + extra*3.0);
+
+      // add slight curved motion toward the intake for more dynamic feel
+      b.vx += (-ny) * swirl * (0.6 + extra);
+      b.vy += ( nx) * swirl * (0.6 + extra);
+
+      // stronger damping during suction
+      b.vx *= (i === candidateIndex ? .988 : .982);
+      b.vy *= (i === candidateIndex ? .988 : .982);
+
+      b.x += b.vx * dt * 0.09;
+      b.y += b.vy * dt * 0.09;
+
+      // Keep all balls inside chamber until the winning ball reaches the mouth.
+      keepInside(b);
+    });
+
+    resolveCollisions();
+
+    const c = balls[candidateIndex];
+    if(!c) return;
+
+    const d = distance(c, mouth);
+    if(d < 42){
+      tubeStart = {x:c.x, y:c.y};
+      selectedBall = {...c};
+      balls.splice(candidateIndex,1);
+      state = 'tube';
+      tubeProgress = 0;
+      status.textContent = '🎱 당첨 공이 통로를 따라 올라갑니다…';
+    }
+  }
+
+  function updateTube(dt){
+    // remaining balls settle gently
+    balls.forEach(b=>{
+      b.vx *= .97;
+      b.vy *= .97;
+      b.x += b.vx * dt * 0.04;
+      b.y += b.vy * dt * 0.04;
+      keepInside(b);
+    });
+
+    tubeProgress += dt / 1650;
+    const t = Math.min(1, tubeProgress);
+
+    if(t < 0.18){
+      const u = t / 0.18;
+      selectedBall.x = tubeStart.x + (mouth.x - tubeStart.x) * u;
+      selectedBall.y = tubeStart.y + (mouth.y - tubeStart.y) * u;
+    } else {
+      const u = (t - 0.18) / 0.82;
+      const p = cubicPoint(tubeCurve.p0, tubeCurve.p1, tubeCurve.p2, tubeCurve.p3, u);
+      selectedBall.x = p.x;
+      selectedBall.y = p.y;
+    }
+
+    if(t >= 1){
+      state = 'idle';
+      drawBtn.disabled = false;
+      resetBtn.disabled = false;
+      [...nameGrid.querySelectorAll('input')].forEach(i=>i.disabled=false);
+      status.textContent = `🎉 ${selectedBall.name} 당첨!`;
+      showWinner(selectedBall.name, selectedBall.color);
+      cancelAnimationFrame(animId);
+      drawScene();
+    }
+  }
+
+  function animate(ts){
+    if(!lastTime) lastTime = ts;
+    const dt = Math.min(32, ts - lastTime);
+    lastTime = ts;
+
+    if(state === 'mixing'){
+      updateFloating(dt);
+      if(ts - startTime > 5000){
+        candidateIndex = nearestBallIndexToMouth();
+        state = 'suction';
+        status.textContent = '🌀 흡입구가 열렸습니다! 가까운 공이 빨려 들어갑니다…';
+      }
+    } else if(state === 'suction'){
+      updateSuction(dt);
+    } else if(state === 'tube'){
+      updateTube(dt);
+    }
+
+    drawScene();
+    if(state !== 'idle'){
+      animId = requestAnimationFrame(animate);
+    }
+  }
+
+  function startDraw(){
+    if(state !== 'idle') return;
+    const names = getNames();
+    if(names.length < 2){
+      status.textContent = '이름을 2명 이상 입력해주세요.';
+      return;
+    }
+
+    resetBallsFromInputs();
+    state = 'mixing';
+    selectedBall = null;
+    candidateIndex = -1;
+    tubeStart = null;
+    tubeProgress = 0;
+
+    balls.forEach(b=>{
+      b.vx = (Math.random()-.5)*6.2;
+      b.vy = -2.8 - Math.random()*4.2;
+    });
+
+    drawBtn.disabled = true;
+    resetBtn.disabled = true;
+    [...nameGrid.querySelectorAll('input')].forEach(i=>i.disabled=true);
+
+    startTime = performance.now();
+    lastTime = 0;
+    status.textContent = '🌪️ 강한 바람으로 공을 섞고 있습니다…';
+    cancelAnimationFrame(animId);
+    animId = requestAnimationFrame(animate);
+  }
+
+  // Winner effects
+  const fx = document.getElementById('fxCanvas');
+  const fctx = fx.getContext('2d');
+  let fxParticles = [];
+  let fxAnim = null;
+
+  function resizeFx(){
+    const dpr = window.devicePixelRatio || 1;
+    fx.width = innerWidth * dpr;
+    fx.height = innerHeight * dpr;
+    fx.style.width = innerWidth + 'px';
+    fx.style.height = innerHeight + 'px';
+    fctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function burst(x,y,count=100){
+    const palette=['#f43f5e','#f59e0b','#fde047','#22c55e','#38bdf8','#8b5cf6','#ffffff'];
+    for(let i=0;i<count;i++){
+      const a=Math.random()*Math.PI*2;
+      const sp=3+Math.random()*8;
+      fxParticles.push({
+        x,y,
+        vx:Math.cos(a)*sp,
+        vy:Math.sin(a)*sp,
+        g:.08,
+        life:60+Math.random()*60,
+        size:4+Math.random()*5,
+        rot:Math.random()*Math.PI,
+        vr:(Math.random()-.5)*.35,
+        color:palette[Math.floor(Math.random()*palette.length)]
+      });
+    }
+  }
+
+  function playFx(){
+    resizeFx();
+    fxParticles=[];
+    burst(innerWidth*.2,innerHeight*.35,110);
+    burst(innerWidth*.8,innerHeight*.35,110);
+    burst(innerWidth*.5,innerHeight*.18,90);
+
+    function loop(){
+      fctx.clearRect(0,0,innerWidth,innerHeight);
+      for(let i=fxParticles.length-1;i>=0;i--){
+        const p=fxParticles[i];
+        p.x+=p.vx;
+        p.y+=p.vy;
+        p.vy+=p.g;
+        p.vx*=.994;
+        p.life--;
+        p.rot+=p.vr;
+
+        fctx.save();
+        fctx.translate(p.x,p.y);
+        fctx.rotate(p.rot);
+        fctx.globalAlpha=Math.max(0,Math.min(1,p.life/35));
+        fctx.fillStyle=p.color;
+        fctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*.7);
+        fctx.restore();
+
+        if(p.life<=0 || p.y>innerHeight+40) fxParticles.splice(i,1);
+      }
+      if(winnerOverlay.classList.contains('show') || fxParticles.length){
+        fxAnim=requestAnimationFrame(loop);
+      }
+    }
+    cancelAnimationFrame(fxAnim);
+    loop();
+  }
+
+  function showWinner(name,color){
+    winnerName.textContent = name;
+    winnerBall.textContent = name;
+    winnerBall.style.background = color;
+    winnerOverlay.classList.add('show');
+    playFx();
+  }
+
+  function closeWinner(){
+    winnerOverlay.classList.remove('show');
+    cancelAnimationFrame(fxAnim);
+    fctx.clearRect(0,0,innerWidth,innerHeight);
+  }
+
+  drawBtn.addEventListener('click', startDraw);
+  resetBtn.addEventListener('click', ()=>{
+    if(state !== 'idle') return;
+    createInputs(defaults);
+    status.textContent='기본 이름으로 초기화했습니다.';
+  });
+  closeBtn.addEventListener('click', closeWinner);
+  winnerOverlay.addEventListener('click', e=>{
+    if(e.target === winnerOverlay) closeWinner();
+  });
+  window.addEventListener('resize', resizeFx);
+
+  createInputs();
+})();
+</script>
+</body>
+</html>
